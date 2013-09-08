@@ -1,0 +1,6 @@
+*.o
+in/*
+out/*
+*.ppm
+*.jpg
+test
