@@ -12,19 +12,8 @@
 #include "ppmio.h"
 #include "ycbcr.h"
 #include "counter.h"
-
-
-typedef struct {
-	logger_t l;
-	char *readerstr;
-	char *writerstr;
-} ioglobals_t;
-
-typedef struct {
-	counter_t counter;
-	buffer_t buffer;
-	ioglobals_t common;
-} threaddata_t;
+#include "work.h"
+#include "ppmsupport.h"
 
 void *ppmgenreader(unsigned int index, void* old, void* state, int *status) { /*{{{*/
 	ioglobals_t *common = (ioglobals_t*) state;
@@ -32,20 +21,35 @@ void *ppmgenreader(unsigned int index, void* old, void* state, int *status) { /*
 	sprintf(command, common->readerstr, index);
 	log(&common->l, "reading file %u with command '%s'\n", index, command);
 
+	imagedata_t *imd = (imagedata_t*)old;
+	if (imd == NULL) {
+		imd = calloc(sizeof(imagedata_t), 1);
+	}
+	assert(imd != NULL);
+
 	FILE *pfd = popen(command, "r");
 	int flag = PPM_OK;
-	ppm_t *cimg = ppm_fread(old, pfd, &flag);
+	imd->orig = ppm_fread(imd->orig, pfd, &flag);
 	pclose(pfd);
-	if (flag != PPM_OK) {
-		log(&common->l, "reading failed...\n");
-		*status = READERROR;
-		return NULL;
+	assert(flag == PPM_OK);
+	assert(imd->orig != NULL);
+	log(&common->l, "wxh: %u x %u\n", imd->orig->width, imd->orig->height);
+
+	unsigned int powers[NSC] = {0, 3, 4}; // zero never used
+	for (size_t i=0; i<NSC; ++i) {
+		unsigned int additive = (1<<powers[i])-1;
+		imd->tfsc[i] = ppm_new(imd->tfsc[i], (imd->orig->width+additive)>>i, (imd->orig->height+additive)>>i);
+		assert(imd->tfsc[i] != NULL);
+		log(&common->l, "index %u: created image %u/%u for colour transform and dimensions %u x %u\n", index, i, NSC, imd->tfsc[i]->width, imd->tfsc[i]->height);
 	}
-	log(&common->l, "wxh: %u x %u\n", cimg->width, cimg->height);
-	to_ycbcr(cimg->data, cimg->data, cimg->width*cimg->height);
+	to_ycbcr(imd->tfsc[0]->data, imd->orig->data, imd->orig->width*imd->orig->height);
+	for (size_t i=1; i<NSC; ++i) {
+		scalepow2(imd->tfsc[i], imd->tfsc[0], powers[i]);
+	}
 	free(command);
-	return cimg;
+	return imd;
 } /*}}}*/
+
 void ppmrelinquisher(void *data, unsigned int index, void *state, bool kill) { /*{{{*/
 	ioglobals_t *common = (ioglobals_t*) state;
 	if (!kill) {
@@ -53,7 +57,12 @@ void ppmrelinquisher(void *data, unsigned int index, void *state, bool kill) { /
 	}
 	else {
 		log(&common->l, "destroying index %u\n", index);
-		ppm_free(data);
+		imagedata_t *imd = (imagedata_t*) data;
+		ppm_free(imd->orig);
+		for (size_t i=0; i<NSC; ++i) {
+			ppm_free(imd->tfsc[i]);
+		}
+		free(data);
 	}
 } /*}}}*/
 void ppmsaver(unsigned int index, ppm_t *data, ioglobals_t *common) { /*{{{*/
@@ -65,81 +74,6 @@ void ppmsaver(unsigned int index, ppm_t *data, ioglobals_t *common) { /*{{{*/
 	ppm_fwrite(pfd, data);
 	pclose(pfd);
 	free(command);
-} /*}}}*/
-void *workfunc(void *data) { /*{{{*/
-	threaddata_t *td = (threaddata_t*) data;
-	size_t index;
-	ppm_t *out = NULL;
-	while ((index = counter_get(&td->counter)) < td->counter.end) {
-		if (index > 1) {
-		log(&td->common.l, "processing index %u\n", index)
-			int status;
-			ppm_t *cimg = buffer_get(&td->buffer, index, &td->common, &status, NULL);
-			ppm_t *pimg = buffer_get(&td->buffer, index-1, &td->common, &status, NULL);
-			//size_t sz = cimg->width*cimg->height;
-			out = ppm_new(out, cimg->width, cimg->height);
-			size_t t = index;
-
-			for (size_t y0=0; y0<cimg->height; ++y0) {
-				for (size_t x0=0; x0<cimg->width; ++x0) {
-
-					size_t p0 = (y0)*cimg->width+(x0);
-					int ydelta = (int)cimg->data[p0].x[0] - (int)pimg->data[p0].x[0];
-					int cbdelta = (int)cimg->data[p0].x[1] - (int)pimg->data[p0].x[1];
-					int crdelta = (int)cimg->data[p0].x[2] - (int)pimg->data[p0].x[2];
-					if (abs(ydelta)>=abs(240-t)>>1 ||
-							abs(cbdelta)>=abs(240-t)>>3 ||
-							abs(crdelta)>=abs(240-t)>>3) {
-
-						// input data
-						uint8_t Y = cimg->data[p0].x[0];
-						uint8_t Cb = cimg->data[p0].x[1];
-						uint8_t Cr = cimg->data[p0].x[2];
-
-						size_t x1 = x0^(Y+t);
-						size_t y1 = (y0^Cb-t);
-						if (Y > 127) {
-							y1 ^= x1&0x600;
-						}
-						else {
-							y1 ^= ~x1&0x600;
-						}
-
-						size_t x2 = x0^((0x55+t)^Cb);
-						size_t y2 = (y0^(Cr+t));
-
-						size_t x3 = x0^((0x0f-t)^Cr);
-						size_t y3 = (y0^(Cb+t));
-
-						// restricting
-						x1 %= cimg->width;
-						y1 %= cimg->height;
-						x2 %= cimg->width;
-						y2 %= cimg->height;
-						x3 %= cimg->width;
-						y3 %= cimg->height;
-
-						size_t p1 = (y1)*cimg->width+(x1);
-						size_t p2 = (y2)*cimg->width+(x2);
-						size_t p3 = (y3)*cimg->width+(x3);
-
-						out->data[p0].x[0] = ((((int)cimg->data[p1].x[0])*3+((int)cimg->data[p0].x[0]))>>2)&0xf0;
-						out->data[p0].x[1] = (((int)cimg->data[p1].x[1])*3+((int)cimg->data[p0].x[1]))>>2;
-						out->data[p0].x[2] = (((int)cimg->data[p1].x[2])*3+((int)cimg->data[p0].x[2]))>>2;
-					}
-					else {
-						out->data[p0].x[0] = cimg->data[p0].x[0];
-						out->data[p0].x[1] = cimg->data[p0].x[1];
-						out->data[p0].x[2] = cimg->data[p0].x[2];
-					}
-				}
-			}
-			ppmsaver(index, out, &td->common);
-			buffer_relinquish(&td->buffer, index-1, &td->common, NULL);
-			buffer_relinquish(&td->buffer, index, &td->common, NULL);
-		}
-	}
-	pthread_exit(NULL);
 } /*}}}*/
 int main(int argc, char **argv) { /*{{{*/
 	if (argc != 5) {
@@ -153,6 +87,8 @@ int main(int argc, char **argv) { /*{{{*/
 	threaddata_t td;
 	log_init(&td.common.l, stdout);
 	log(&td.common.l, "- logger created\n");
+
+	td.saver = &ppmsaver;
 
 	td.common.writerstr = calloc(strlen(argv[1])+32, sizeof(char));
 	assert(td.common.writerstr != NULL);
