@@ -1,5 +1,5 @@
 #define NTHREADS 8
-#define HISTORY 2
+#define HISTORY 4
 #define BUFFERSIZE (NTHREADS*HISTORY)
 
 #include <pthread.h>
@@ -56,7 +56,6 @@ void ppmrelinquisher(void *data, unsigned int index, void *state, bool kill) { /
 		log(&common->l, "relinquishing index %u\n", index);
 	}
 	else {
-		log(&common->l, "destroying index %u\n", index);
 		imagedata_t *imd = (imagedata_t*) data;
 		ppm_free(imd->orig);
 		for (size_t i=0; i<NSC; ++i) {
