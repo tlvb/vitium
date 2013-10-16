@@ -80,7 +80,7 @@ void *workfunc(void *data) { /*{{{*/
 					int xzm = xz % cimgs[0]->width;
 					int yzm = yz % cimgs[0]->height;
 					int p0z = (yzm)*cimgs[0]->width+(xzm);
-					int p0w = (yw)*cimgs[0]->width+(x1);
+					int p0w = (yw)*cimgs[0]->width+(x2);
 					if (t > 10 && t < 157) {
 						// walk-in from right
 						out->data[p0].x[0] = cimgs[0]->data[p0o].x[0];
@@ -93,6 +93,10 @@ void *workfunc(void *data) { /*{{{*/
 							out->data[p0].x[2] = cimgs[0]->data[p0].x[2]^~oimgs[0]->data[p0].x[1]+t^ydelta;
 							out->data[p0].x[1] ^= cimgs[0]->data[p2].x[2]^0x10^pimgs[0]->data[p3].x[0];
 							out->data[p0].x[2] ^= cimgs[0]->data[p3].x[1]^0x10^pimgs[0]->data[p2].x[0];
+						}
+						else if ((int)cimgs[0]->width-(int)x0 < t-30 + cy && xdiff > 25) {
+							out->data[p0].x[1] = cimgs[0]->data[p0w].x[1]+((int)crdelta-127)*8;
+							out->data[p0].x[2] = cimgs[0]->data[p0w].x[2]+((int)cbdelta-127)*8;
 						}
 						else {
 							out->data[p0].x[1] = cimgs[0]->data[p2].x[1];
@@ -108,14 +112,32 @@ void *workfunc(void *data) { /*{{{*/
 							out->data[p0].x[0] = cimgs[0]->data[p0].x[0];
 						}
 						if ((int)x0 < t-410 + cy) {
-							xdiff += ydelta*2;
+							xdiff += ydelta*3;
 							out->data[p0].x[0] -= t>>8;
 						}
-						if ((int)x0 < t-430 + cy && abs(xdiff) > 50) {
-							out->data[p0].x[1] = cimgs[0]->data[p0].x[1]^oimgs[0]->data[p0].x[2]^t^ydelta;
-							out->data[p0].x[2] = cimgs[0]->data[p0].x[2]^~oimgs[0]->data[p0].x[1]+t^ydelta;
-							out->data[p0].x[1] ^= cimgs[0]->data[p2].x[2]^0x10^pimgs[0]->data[p3].x[0];
-							out->data[p0].x[2] ^= cimgs[0]->data[p3].x[1]^0x10^pimgs[0]->data[p2].x[0];
+						if ((int)x0+cy < t-430 && abs(xdiff) > 50) {
+							if (abs(xdiff) > 25 && x0<320 && out->data[p0].x[0]>=10) out->data[p0].x[0] -= 10;
+							out->data[p0].x[0] = cimgs[0]->data[p0].x[0]^oimgs[0]->data[p0].x[0]^t^ydelta;
+							out->data[p0].x[2] = cimgs[0]->data[p0].x[1]^oimgs[0]->data[p0].x[2]^t^ydelta;
+							out->data[p0].x[1] = cimgs[0]->data[p0].x[2]^~oimgs[0]->data[p0].x[1]+t^ydelta;
+							out->data[p0].x[1] ^= cimgs[0]->data[p2].x[2]^0x07^pimgs[0]->data[p3].x[0];
+						}
+						else if (((int)x0)-abs(xdiff/2) < (t*3-1200) && abs(xdiff) > 25 && x0 < 320) {
+							//out->data[p0].x[0] >>=1;
+							out->data[p0].x[2] = cimgs[0]->data[p0w].x[1]+(127-(int)crdelta)*8-ydeltav;
+							out->data[p0].x[1] = cimgs[0]->data[p0w].x[2]+(127-(int)cbdelta)*8-ydeltav;
+							//out->data[p0].x[2] ^= (cimgs[0]->data[p2].x[2]^pimgs[0]->data[p3].x[1])&0x3f;
+							/*
+							out->data[p0].x[1] ^= (cimgs[0]->data[p3].x[2]^pimgs[0]->data[p2].x[1])&0x3f;
+							out->data[p0].x[2] ^= cimgs[0]->data[p3].x[1]^0x07^pimgs[0]->data[p2].x[0];
+							*/
+						}
+						else if (((int)x0)-abs(xdiff/2) < (t*3-1200) && x0 < 320 && abs(xdiff) > 0 && abs(xdiff)+abs(ydeltaw)*5 > 25) {
+							out->data[p0].x[0] >>=1;
+							out->data[p0].x[2] = cimgs[0]->data[p0w].x[1]+(127-(int)crdelta)*8-ydeltav;
+							out->data[p0].x[1] = cimgs[0]->data[p0w].x[2]+(127-(int)cbdelta)*8-ydeltav;
+							out->data[p0].x[1] ^= cimgs[0]->data[p2].x[2]^0x38^pimgs[0]->data[p3].x[0];
+							out->data[p0].x[2] ^= cimgs[0]->data[p3].x[1]^0x38^pimgs[0]->data[p2].x[0];
 						}
 						else {
 							out->data[p0].x[1] = cimgs[0]->data[p0o].x[1];
@@ -135,16 +157,23 @@ void *workfunc(void *data) { /*{{{*/
 						}
 */
 					}
-					else if (t >= 565 && t <= 650 && xz > 400) {
-						if (xz < 420) {
+					else if (t >= 565 && t <= 650 && xz > 555) {
+						if (xz < 575) {
+							/*
 							out->data[p0].x[0] = cimgs[0]->data[p0].x[0]&oimgs[0]->data[p0z].x[0];
-							out->data[p0].x[1] = cimgs[0]->data[p0].x[1]^oimgs[0]->data[p0z].x[2];
-							out->data[p0].x[2] = cimgs[0]->data[p0].x[2]^~oimgs[0]->data[p0z].x[1];
+							out->data[p0].x[2] = cimgs[0]->data[p0].x[2]^oimgs[0]->data[p0z].x[1]^(((int)cbdelta-127)*32+127);
+							out->data[p0].x[1] = cimgs[0]->data[p0].x[1]^~oimgs[0]->data[p0z].x[2]^(((int)crdelta-127)*32+127);
+							*/
+							out->data[p0].x[0] = cimgs[0]->data[p0].x[0]^oimgs[0]->data[p0].x[0]^t^ydelta;
+							out->data[p0].x[1] = cimgs[0]->data[p0].x[1]^oimgs[0]->data[p0].x[2]^t^ydelta;
+							out->data[p0].x[2] = cimgs[0]->data[p0].x[2]^~oimgs[0]->data[p0].x[1]+t^ydelta;
+							out->data[p0].x[1] ^= cimgs[0]->data[p2].x[2]^0x10^pimgs[0]->data[p3].x[0];
+							out->data[p0].x[2] ^= cimgs[0]->data[p3].x[1]^0x10^pimgs[0]->data[p2].x[0];
 						}
 						else {
-							out->data[p0].x[0] = cimgs[0]->data[p0w].x[0];
-							out->data[p0].x[1] = cimgs[0]->data[p0w].x[1];
-							out->data[p0].x[2] = cimgs[0]->data[p0w].x[2];
+							out->data[p0].x[0] = (cimgs[0]->data[p0w].x[0]|((cimgs[0]->data[p0w].x[0]&0x1f)<<1)&0xf0);
+							out->data[p0].x[1] = cimgs[0]->data[p0w].x[1];//+(127-(int)crdelta)*8;
+							out->data[p0].x[2] = cimgs[0]->data[p0w].x[2];//+((int)cbdelta-127)*8;
 						}
 					}
 					else if (t > 670) {
@@ -158,10 +187,10 @@ void *workfunc(void *data) { /*{{{*/
 						else if (yz < 200 && x0 > 290 && abs(cydelta) > 6) {
 							// glitch if diffy
 							out->data[p0].x[0] = cimgs[0]->data[p0].x[0]^couchonly->tfsc[0]->data[p0].x[0]^t^ydelta;
-							out->data[p0].x[1] = cimgs[0]->data[p0].x[1]^couchonly->tfsc[0]->data[p0].x[2]^t^ydelta;
-							out->data[p0].x[2] = cimgs[0]->data[p0].x[2]^~couchonly->tfsc[0]->data[p0].x[1]+t^ydelta;
-							out->data[p0].x[1] ^= cimgs[0]->data[p2].x[2]^0x10^pimgs[0]->data[p3].x[0];
-							out->data[p0].x[2] ^= cimgs[0]->data[p3].x[1]^0x10^pimgs[0]->data[p2].x[0];
+							out->data[p0].x[2] = cimgs[0]->data[p0].x[1]^couchonly->tfsc[1]->data[p0].x[2]^t^ydelta;
+							out->data[p0].x[1] = cimgs[0]->data[p0].x[2]^~couchonly->tfsc[2]->data[p0].x[1]+t^ydelta;
+							out->data[p0].x[2] ^= cimgs[0]->data[p2].x[2]^0x10^pimgs[0]->data[p3].x[0];
+							out->data[p0].x[1] ^= cimgs[0]->data[p3].x[1]^0x10^pimgs[0]->data[p2].x[0];
 						}
 						else {
 							out->data[p0].x[0] = cimgs[0]->data[p0].x[0];
