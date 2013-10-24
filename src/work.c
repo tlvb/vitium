@@ -29,7 +29,7 @@ time_t get_time(const char *fn, logger_t *l) { /*{{{*/
 	);
 	return sse;
 } /*}}}*/
-void scalepow2(ppm_t *out, ppm_t *in, unsigned int spow) { /*{{{*/
+void scalepow2(bitmap_t *out, bitmap_t *in, unsigned int spow) { /*{{{*/
 	unsigned int limit = 1<<spow;
 	for (size_t ty=0; ty<out->height; ++ty) {
 		for (size_t tx=0; tx<out->width; ++tx) {
@@ -145,7 +145,7 @@ void unloader(void *data, unsigned int index, void *state, bool kill) { /*{{{*/
 		free(data);
 	}
 } /*}}}*/
-void saver(unsigned int index, ppm_t *data, ioglobals_t *common) { /*{{{*/
+void saver(unsigned int index, bitmap_t *data, ioglobals_t *common) { /*{{{*/
 	char *command = calloc(strlen(common->writerstr)+128, sizeof(char));
 	to_rgb(data->data, data->data, data->width*data->height);
 	sprintf(command, common->writerstr, index);
@@ -161,8 +161,8 @@ void saver(unsigned int index, ppm_t *data, ioglobals_t *common) { /*{{{*/
 } /*}}}*/
 void *workfunc(void *data) { /*{{{*/
 	threaddata_t *td = (threaddata_t*) data;
-	ppm_t *out = NULL;
-	ppm_t *dsz = NULL;
+	bitmap_t *out = NULL;
+	bitmap_t *dsz = NULL;
 	size_t index = counter_get(&td->counter);
 	log(&td->common.l, "thread says hello, starts with index %u, start is %u, end is %u\n", index, td->counter.start, td->counter.end);
 	imagedata_t *couchonly = NULL;
@@ -183,9 +183,9 @@ void *workfunc(void *data) { /*{{{*/
 				//nocouch = buffer_get(&td->buffer, 616, &td->common, &status, NULL);
 				nocouch = buffer_get(&td->buffer, index-400, &td->common, &status, NULL);
 			}
-			ppm_t **cimgs = cimd->tfsc;
-			ppm_t **pimgs = pimd->tfsc;
-			ppm_t **oimgs = oimd->tfsc;
+			bitmap_t **cimgs = cimd->tfsc;
+			bitmap_t **pimgs = pimd->tfsc;
+			bitmap_t **oimgs = oimd->tfsc;
 			//size_t sz = cimg->width*cimg->height;
 
 			log(&td->common.l, "@@@ work allocating out image (%p)\n", out);

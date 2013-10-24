@@ -24,18 +24,18 @@ void ignorecomment(FILE *f) { /*{{{*/
 	}
 	ignorewhitespace(f);
 } /*}}}*/
-ppm_t *ppm_read(ppm_t *recycle, char *fn, int *status) { /*{{{*/
+bitmap_t *ppm_read(bitmap_t *recycle, char *fn, int *status) { /*{{{*/
 	FILE *f = fopen(fn, "r");
 	if (f == NULL) {
 		//loc();
 		*status = PPM_FILEERROR;
 		return recycle;
 	}
-	ppm_t *ret = ppm_fread(recycle, f, status);
+	bitmap_t *ret = ppm_fread(recycle, f, status);
 	fclose(f);
 	return ret;
 } /*}}}*/
-ppm_t *ppm_fread(ppm_t *recycle, FILE *f, int *status) { /*{{{*/
+bitmap_t *ppm_fread(bitmap_t *recycle, FILE *f, int *status) { /*{{{*/
 	assert(f);
 	/* magic {{{ */
 	unsigned int magic;
@@ -79,7 +79,7 @@ ppm_t *ppm_fread(ppm_t *recycle, FILE *f, int *status) { /*{{{*/
 	/* }}} */
 	/* allocate memory {{{ */
 	if (recycle == NULL) {
-		recycle = calloc(1, sizeof(ppm_t));
+		recycle = calloc(1, sizeof(bitmap_t));
 		if (recycle == NULL) {
 			//loc();
 			*status = PPM_BADALLOC;
@@ -116,7 +116,7 @@ ppm_t *ppm_fread(ppm_t *recycle, FILE *f, int *status) { /*{{{*/
 	*status = PPM_OK;
 	return recycle;
 } /*}}}*/
-int ppm_write(char *fn, ppm_t *img) { /*{{{*/
+int ppm_write(char *fn, bitmap_t *img) { /*{{{*/
 	FILE *f = fopen(fn, "w");
 	if (f == NULL)
 		return PPM_FILEERROR;
@@ -126,7 +126,7 @@ int ppm_write(char *fn, ppm_t *img) { /*{{{*/
 	fclose(f);
 	return PPM_OK;
 } /*}}}*/
-int ppm_fwrite(FILE *f, ppm_t *img) { /*{{{*/
+int ppm_fwrite(FILE *f, bitmap_t *img) { /*{{{*/
 	assert(f);
 	size_t count = img->width * img->height;
 	fprintf(f, "P6\n%d %d\n255\n", img->width, img->height);
@@ -136,7 +136,7 @@ int ppm_fwrite(FILE *f, ppm_t *img) { /*{{{*/
 	}
 	return PPM_OK;
 } /*}}}*/
-ppm_t *ppm_new(ppm_t *recycle, unsigned int width, unsigned int height) { /*{{{*/
+bitmap_t *ppm_new(bitmap_t *recycle, unsigned int width, unsigned int height) { /*{{{*/
 	if (recycle != NULL) {
 		if (recycle->data != NULL) {
 			if (recycle->width*recycle->height < width*height) {
@@ -165,7 +165,7 @@ ppm_t *ppm_new(ppm_t *recycle, unsigned int width, unsigned int height) { /*{{{*
 		recycle->height = height;
 	}
 	else {
-		recycle = malloc(sizeof(ppm_t));
+		recycle = malloc(sizeof(bitmap_t));
 		if (recycle == NULL) {
 			return NULL;
 		}
@@ -179,7 +179,7 @@ ppm_t *ppm_new(ppm_t *recycle, unsigned int width, unsigned int height) { /*{{{*
 		return recycle;
 	}
 } /*}}}*/
-ppm_t *ppm_free(ppm_t *prisoner) { /*{{{*/
+bitmap_t *ppm_free(bitmap_t *prisoner) { /*{{{*/
 	if (prisoner != NULL) {
 		if (prisoner->data != NULL) {
 			free(prisoner->data);

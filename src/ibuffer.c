@@ -1,7 +1,7 @@
 #include "ibuffer.h"
 #include <assert.h>
 
-int buffer_init(buffer_t *b, size_t size, reader_func reader, relinquisher_func relinquisher) {
+int buffer_init(buffer_t *b, size_t size, reader_func reader, relinquisher_func relinquisher) { /*{{{*/
 	b->m = malloc(sizeof(pthread_mutex_t));
 	assert(b->m != NULL);
 	pthread_mutex_init(b->m, NULL);
@@ -11,9 +11,8 @@ int buffer_init(buffer_t *b, size_t size, reader_func reader, relinquisher_func 
 	b->pop = 0;
 	b->reader = reader;
 	b->relinquisher = relinquisher;
-}
-
-int buffer_destroy(buffer_t *b, void *state) {
+} /*}}}*/
+int buffer_destroy(buffer_t *b, void *state) { /*{{{*/
 	for (size_t i=0; i<b->pop; ++i) {
 		(*b->relinquisher)(b->storage[i].data, b->storage[i].index, state, true);
 	}
@@ -21,8 +20,7 @@ int buffer_destroy(buffer_t *b, void *state) {
 	b->bsize = 0;
 	pthread_mutex_destroy(b->m);
 	free(b->m);
-}
-
+} /*}}}*/
 void *buffer_get(buffer_t *b, unsigned int index, void *state, int *status, pthread_cond_t *wait_var) { /*{{{*/
 	pthread_mutex_lock(b->m);
 	// buffer is assumed to be small relative to the number of searches
@@ -79,7 +77,6 @@ void *buffer_get(buffer_t *b, unsigned int index, void *state, int *status, pthr
 		}
 	}
 } /*}}}*/
-
 void buffer_relinquish(buffer_t *b, unsigned int index, void *state, pthread_cond_t *wait_var) { /*{{{*/
 	pthread_mutex_lock(b->m);
 	for (size_t i=0; i<b->pop; ++i) {

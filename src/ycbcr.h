@@ -1,7 +1,7 @@
 #ifndef __YCBCR_H__
 #define __YCBCR_H__
 
-#include "common.h"
+#include "graphics.h"
 #include <inttypes.h>
 #include <stddef.h>
 
