@@ -9,7 +9,6 @@
 #include "ycbcr.h"
 #include "counter.h"
 #include "work.h"
-#include "ppmsupport.h"
 
 int main(int argc, char **argv) { /*{{{*/
 	if (argc != 5) {

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <limits.h>
 #include <ctype.h>
+#include <assert.h>
 
 //#define loc() fprintf(stderr, "%s : line %4d\n", __FILE__, __LINE__)
 
@@ -35,6 +36,7 @@ ppm_t *ppm_read(ppm_t *recycle, char *fn, int *status) { /*{{{*/
 	return ret;
 } /*}}}*/
 ppm_t *ppm_fread(ppm_t *recycle, FILE *f, int *status) { /*{{{*/
+	assert(f);
 	/* magic {{{ */
 	unsigned int magic;
 	if (1 != fscanf(f, "P%u", &magic)) {
@@ -125,6 +127,7 @@ int ppm_write(char *fn, ppm_t *img) { /*{{{*/
 	return PPM_OK;
 } /*}}}*/
 int ppm_fwrite(FILE *f, ppm_t *img) { /*{{{*/
+	assert(f);
 	size_t count = img->width * img->height;
 	fprintf(f, "P6\n%d %d\n255\n", img->width, img->height);
 	if (count != fwrite(img->data, sizeof(u83_t), count, f)) {
@@ -137,6 +140,7 @@ ppm_t *ppm_new(ppm_t *recycle, unsigned int width, unsigned int height) { /*{{{*
 	if (recycle != NULL) {
 		if (recycle->data != NULL) {
 			if (recycle->width*recycle->height < width*height) {
+				printf("@@@ ppmio old image to small, reallocating data\n");
 				free(recycle->data);
 				recycle->data = calloc(width*height, sizeof(u83_t));
 				if (recycle->data == NULL) {
@@ -145,13 +149,17 @@ ppm_t *ppm_new(ppm_t *recycle, unsigned int width, unsigned int height) { /*{{{*
 				}
 			}
 			else {
+				printf("@@@ ppmio old image big enough, reusing data\n");
 				memset(recycle->data, 0, width*height*sizeof(u83_t));
 			}
 		}
-		recycle->data = calloc(width*height, sizeof(u83_t));
-		if (recycle->data == NULL) {
-			free(recycle);
-			return NULL;
+		else {
+			printf("@@@ ppmio allocating new data -- should probably be an else here so only data==NULL cases go here?\n");
+			recycle->data = calloc(width*height, sizeof(u83_t));
+			if (recycle->data == NULL) {
+				free(recycle);
+				return NULL;
+			}
 		}
 		recycle->width = width;
 		recycle->height = height;

@@ -1,6 +1,63 @@
 #include "work.h"
-#include "ppmsupport.h"
+#include <stdio.h>
 
+time_t get_time(const char *fn, logger_t *l) { /*{{{*/
+	log(l, "trying to open \"%s\"\n", fn);
+	FILE *fd = fopen(fn, "rb");
+	assert(fd);
+	char dstr[20];
+	fseek(fd, 188, SEEK_SET);
+	fread(dstr, sizeof(char), 19, fd);
+	fclose(fd);
+	struct tm t;
+	dstr[19] = '\0';
+	// 2013:12:27 18:20:32
+	// 0123456789012345678
+	t.tm_year = atoi(dstr);
+	t.tm_mon = atoi(dstr+5);
+	t.tm_mday = atoi(dstr+8);
+	t.tm_hour = atoi(dstr+10);
+	t.tm_min = atoi(dstr+14);
+	t.tm_sec = atoi(dstr+17);
+
+	time_t sse = mktime(&t);
+
+	log(l, "%s -> %s -> %d-%d-%d %d:%d:%d -> %u\n", fn, dstr,
+		t.tm_year, t.tm_mon, t.tm_mday,
+		t.tm_hour, t.tm_min, t.tm_sec,
+		sse
+	);
+	return sse;
+} /*}}}*/
+void scalepow2(ppm_t *out, ppm_t *in, unsigned int spow) { /*{{{*/
+	unsigned int limit = 1<<spow;
+	for (size_t ty=0; ty<out->height; ++ty) {
+		for (size_t tx=0; tx<out->width; ++tx) {
+			size_t tp = tx + ty*out->width;
+			unsigned int ys = 0;
+			unsigned int cbs = 0;
+			unsigned int crs = 0;
+			size_t ctr = 0;
+			for (size_t y=0; y<limit; ++y) {
+				size_t sy = ty*limit + y;
+				if (sy >= in->height) { break; }
+				for (size_t x=0; x<limit; ++x) {
+					size_t sx = tx*limit + x;
+					if (sx >= in->width) { break; }
+					size_t sp = sx + sy*in->width;
+					ys += in->data[sp].x[0];
+					cbs += in->data[sp].x[1];
+					crs += in->data[sp].x[2];
+					++ctr;
+				}
+			}
+			ctr = ctr==0?1:ctr;
+			out->data[tp].x[0] = ys/ctr;
+			out->data[tp].x[1] = cbs/ctr;
+			out->data[tp].x[2] = crs/ctr;
+		}
+	}
+} /*}}}*/
 void init_threaddata(threaddata_t *td, const char *ofmt, const char *ifmt, int start, int stop) { /*{{{*/
 	log_init(&td->common.l, stdout);
 	log(&td->common.l, "- logger created\n");
@@ -10,6 +67,7 @@ void init_threaddata(threaddata_t *td, const char *ofmt, const char *ifmt, int s
 	sprintf(td->common.writerstr, "pnmtojpeg -quality=100 > %s", ofmt);
 	log(&td->common.l, "- output shape is '%s'\n", td->common.writerstr);
 
+	td->common.readerfmt = ifmt;
 	td->common.readerstr = calloc(strlen(ifmt)+16, sizeof(char));
 	assert(td->common.readerstr != NULL);
 	sprintf(td->common.readerstr, "jpegtopnm < %s", ifmt);
@@ -33,8 +91,9 @@ void destroy_threaddata(threaddata_t *td) { /*{{{*/
 void *loader(unsigned int index, void* old, void* state, int *status) { /*{{{*/
 	ioglobals_t *common = (ioglobals_t*) state;
 	char *command = calloc(strlen(common->readerstr)+128, sizeof(char));
+	char *fn = calloc(strlen(common->readerfmt)+128, sizeof(char));
 	sprintf(command, common->readerstr, index);
-	log(&common->l, "reading file %u with command '%s'\n", index, command);
+	sprintf(fn, common->readerfmt, index);
 
 	imagedata_t *imd = (imagedata_t*)old;
 	if (imd == NULL) {
@@ -42,10 +101,19 @@ void *loader(unsigned int index, void* old, void* state, int *status) { /*{{{*/
 	}
 	assert(imd != NULL);
 
+	imd->stamp = get_time(fn, &common->l);
+	free(fn);
+
 	FILE *pfd = popen(command, "r");
+	log(&common->l, "reading file %u (%s) with command '%s'\n", index, fn, command);
+	if (!pfd) {
+		perror(NULL);
+	}
+	assert(pfd != NULL);
 	int flag = PPM_OK;
 	imd->orig = ppm_fread(imd->orig, pfd, &flag);
 	pclose(pfd);
+	free(command);
 	assert(flag == PPM_OK);
 	assert(imd->orig != NULL);
 	log(&common->l, "wxh: %u x %u\n", imd->orig->width, imd->orig->height);
@@ -61,7 +129,6 @@ void *loader(unsigned int index, void* old, void* state, int *status) { /*{{{*/
 	for (size_t i=1; i<NSC; ++i) {
 		scalepow2(imd->tfsc[i], imd->tfsc[0], powers[i]);
 	}
-	free(command);
 	return imd;
 } /*}}}*/
 void unloader(void *data, unsigned int index, void *state, bool kill) { /*{{{*/
@@ -84,6 +151,10 @@ void saver(unsigned int index, ppm_t *data, ioglobals_t *common) { /*{{{*/
 	sprintf(command, common->writerstr, index);
 	log(&common->l, "writing file %u with command '%s'\n", index, command);
 	FILE *pfd = popen(command, "w");
+	if (!pfd) {
+		perror(NULL);
+	}
+	assert(pfd);
 	ppm_fwrite(pfd, data);
 	pclose(pfd);
 	free(command);
@@ -101,7 +172,7 @@ void *workfunc(void *data) { /*{{{*/
 	while (index < td->counter.end) {
 		if (index > td->counter.start+1) { // required delta depends on glitch implementation required history depth
 			log(&td->common.l, "processing index %u\n", index)
-			int status;
+			int status = OK;
 			imagedata_t *cimd = buffer_get(&td->buffer, index, &td->common, &status, NULL);
 			imagedata_t *pimd = buffer_get(&td->buffer, index-1, &td->common, &status, NULL);
 			imagedata_t *oimd = buffer_get(&td->buffer, index-2, &td->common, &status, NULL);
@@ -117,7 +188,9 @@ void *workfunc(void *data) { /*{{{*/
 			ppm_t **oimgs = oimd->tfsc;
 			//size_t sz = cimg->width*cimg->height;
 
+			log(&td->common.l, "@@@ work allocating out image (%p)\n", out);
 			out = ppm_new(out, cimgs[0]->width, cimgs[0]->height);
+			log(&td->common.l, "@@@ work out image done (%p)\n", out);
 
 			int t = index;
 
