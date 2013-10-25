@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=--std=gnu99 -Wextra -pedantic-errors -g
+CFLAGS=--std=gnu99 -Wextra -Wno-sign-compare -pedantic-errors -g
 
 vpath %.c src/
 vpath %.h src/
