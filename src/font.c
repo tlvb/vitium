@@ -5,22 +5,19 @@
 #include <string.h>
 
 
-pcf2_font_t *font_load(const char *fn) { /*{{{*/
+void font_load(pcf2_font_t *font, const char *fn) { /*{{{*/
 	FILE *fd = fopen(fn, "rb");
 	assert(fd);
-	pcf2_font_t *f = malloc(sizeof(pcf2_font_t));
-	assert(f);
-	fread(&f->header, sizeof(pcf2_header_t), 1, fd);
-	f->bitmap = malloc(sizeof(uint8_t)*
-		f->header.charsize*f->header.length
+	fread(&font->header, sizeof(pcf2_header_t), 1, fd);
+	font->bitmap = malloc(sizeof(uint8_t)*
+		font->header.charsize*font->header.length
 	);
-	fread(f->bitmap, sizeof(uint8_t), f->header.charsize*f->header.length, fd);
+	fread(font->bitmap, sizeof(uint8_t), font->header.charsize*font->header.length, fd);
 	fclose(fd);
-	f->bpr = f->header.charsize / f->header.height;
+	font->bpr = font->header.charsize / font->header.height;
 } /*}}}*/
-void font_free(pcf2_font_t *font) { /*{{{*/
+void font_destroy(pcf2_font_t *font) { /*{{{*/
 	free(font->bitmap);
-	free(font);
 } /*}}}*/
 void draw_glyph(bitmap_t *canvas,  int x,  int y, unsigned int c, const pcf2_font_t *f, const u83_t *fg) { /*{{{*/
 	for (int dy=0; dy<f->header.height; ++dy) {

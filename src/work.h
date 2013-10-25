@@ -12,9 +12,11 @@
 #include <string.h>
 #include "ibuffer.h"
 #include "logger.h"
+#include "graphics.h"
 #include "ppmio.h"
 #include "ycbcr.h"
 #include "counter.h"
+#include "font.h"
 
 
 typedef struct {
@@ -28,6 +30,7 @@ typedef struct {
 	counter_t counter;
 	buffer_t buffer;
 	ioglobals_t common;
+	pcf2_font_t font;
 } threaddata_t;
 
 typedef struct {

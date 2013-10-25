@@ -22,8 +22,8 @@ typedef struct {
 	uint8_t *bitmap;
 } pcf2_font_t;
 
-pcf2_font_t *font_load(const char* fn);
-void font_free(pcf2_font_t *font);
+void font_load(pcf2_font_t *font, const char* fn);
+void font_destroy(pcf2_font_t *font);
 void draw_glyph(bitmap_t *canvas, int x, int y, unsigned int c, const pcf2_font_t *f, const u83_t *fg);
 void draw_string(bitmap_t *canvas, int x, int y, const char *s, const pcf2_font_t *f, const u83_t *fg);
 void draw_glyph_sc(bitmap_t *canvas, int x, int y, unsigned int c, const pcf2_font_t *f, const u83_t *fg, unsigned int sc);

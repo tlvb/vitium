@@ -121,7 +121,7 @@ void *loader(unsigned int index, void* old, void* state, int *status) { /*{{{*/
 	unsigned int powers[NSC] = {0, 3, 4}; // zero never used
 	for (size_t i=0; i<NSC; ++i) {
 		unsigned int additive = (1<<powers[i])-1;
-		imd->tfsc[i] = ppm_new(imd->tfsc[i], (imd->orig->width+additive)>>i, (imd->orig->height+additive)>>i);
+		imd->tfsc[i] = bitmap_new(imd->tfsc[i], (imd->orig->width+additive)>>i, (imd->orig->height+additive)>>i);
 		assert(imd->tfsc[i] != NULL);
 		log(&common->l, "index %u: created image %u/%u for colour transform and dimensions %u x %u\n", index, i, NSC, imd->tfsc[i]->width, imd->tfsc[i]->height);
 	}
@@ -138,9 +138,9 @@ void unloader(void *data, unsigned int index, void *state, bool kill) { /*{{{*/
 	}
 	else {
 		imagedata_t *imd = (imagedata_t*) data;
-		ppm_free(imd->orig);
+		bitmap_free(imd->orig);
 		for (size_t i=0; i<NSC; ++i) {
-			ppm_free(imd->tfsc[i]);
+			bitmap_free(imd->tfsc[i]);
 		}
 		free(data);
 	}
@@ -189,7 +189,7 @@ void *workfunc(void *data) { /*{{{*/
 			//size_t sz = cimg->width*cimg->height;
 
 			log(&td->common.l, "@@@ work allocating out image (%p)\n", out);
-			out = ppm_new(out, cimgs[0]->width, cimgs[0]->height);
+			out = bitmap_new(out, cimgs[0]->width, cimgs[0]->height);
 			log(&td->common.l, "@@@ work out image done (%p)\n", out);
 
 			int t = index;
@@ -489,6 +489,6 @@ void *workfunc(void *data) { /*{{{*/
 	}
 	//buffer_relinquish(&td->buffer, 616, &td->common, NULL); // nocouch
 	buffer_relinquish(&td->buffer, 680, &td->common, NULL); // couchonly
-	ppm_free(out);
+	bitmap_free(out);
 	pthread_exit(NULL);
 } /*}}}*/
