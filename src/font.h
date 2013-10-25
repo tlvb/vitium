@@ -27,5 +27,7 @@ void font_destroy(pcf2_font_t *font);
 void draw_glyph(bitmap_t *canvas, int x, int y, unsigned int c, const pcf2_font_t *f, const u83_t *fg);
 void draw_string(bitmap_t *canvas, int x, int y, const char *s, const pcf2_font_t *f, const u83_t *fg);
 void draw_glyph_sc(bitmap_t *canvas, int x, int y, unsigned int c, const pcf2_font_t *f, const u83_t *fg, unsigned int sc);
+void draw_glyph_asc(bitmap_t *canvas, int x, int y, unsigned int c, const pcf2_font_t *f, const u83_t *fg, float a, unsigned int sc);
 void draw_string_sc(bitmap_t *canvas, int x, int y, const char *s, const pcf2_font_t *f, const u83_t *fg, unsigned int sc);
+void draw_string_asc(bitmap_t *canvas, int x, int y, const char *s, const pcf2_font_t *f, const u83_t *fg, float a, unsigned int sc);
 #endif

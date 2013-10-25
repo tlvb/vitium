@@ -4,7 +4,7 @@ CFLAGS=--std=gnu99 -Wextra -Wno-sign-compare -pedantic-errors -g
 vpath %.c src/
 vpath %.h src/
 
-vitium: main.c logger.o ycbcr.o ppmio.o ibuffer.o counter.o work.o graphics.o
+vitium: main.c logger.o ycbcr.o ppmio.o ibuffer.o counter.o work.o graphics.o font.o
 	$(CC) $(CFLAGS) -o $@ $(filter-out %.h, $^) -lpthread -lm
 
 %.o: %.c %.h

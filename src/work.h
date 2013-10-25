@@ -4,7 +4,7 @@
 #define NTHREADS 4
 #define HISTORY 4
 #define BUFFERSIZE (NTHREADS*HISTORY)
-#define NSC 3
+#define NSC 2
 
 
 #include <pthread.h>
@@ -36,10 +36,11 @@ typedef struct {
 typedef struct {
 	bitmap_t *orig;
 	bitmap_t *tfsc[NSC];
+	struct tm time;
 	time_t stamp;
 } imagedata_t;
 
-time_t get_time(const char *fn, logger_t *l);
+void get_time(imagedata_t *img, const char *fn, logger_t *l);
 void scalepow2(bitmap_t *out, bitmap_t *in, unsigned int spow);
 void init_threaddata(threaddata_t *td, const char *ofmt, const char *ifmt, int start, int stop);
 void destroy_threaddata(threaddata_t *td);
