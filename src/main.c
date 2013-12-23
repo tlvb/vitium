@@ -15,7 +15,7 @@ int main(int argc, char **argv) { /*{{{*/
 		fprintf(stderr,
 				"Wrong argument count.\n"\
 				"Expects: output-format input-format start end\n"\
-				"e.g. out/o_%%04.jpg in/i_%%04.jpg 0 1024\n");
+				"e.g. out/o_%%04u.jpg in/i_%%04u.jpg 0 1024\n");
 		return -1;
 	}
 

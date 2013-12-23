@@ -2,6 +2,10 @@
 #include <stdio.h>
 
 void get_time(imagedata_t *img, const char *fn, logger_t *l) { /*{{{*/
+	// this is a hack that is targeted to a
+	// specific small set of jpeg images,
+	// not expected, or more so, expected to
+	// not work with arbitrary files
 	log(l, "trying to open \"%s\"\n", fn);
 	FILE *fd = fopen(fn, "rb");
 	assert(fd);
@@ -12,16 +16,16 @@ void get_time(imagedata_t *img, const char *fn, logger_t *l) { /*{{{*/
 	dstr[19] = '\0';
 	// 2013:12:27 18:20:32
 	// 0123456789012345678
-	img->time.tm_year = atoi(dstr);
+	img->time.tm_year = atoi(dstr)-1900;
 	img->time.tm_mon = atoi(dstr+5);
 	img->time.tm_mday = atoi(dstr+8);
-	img->time.tm_hour = atoi(dstr+10);
+	img->time.tm_hour = atoi(dstr+11);
 	img->time.tm_min = atoi(dstr+14);
 	img->time.tm_sec = atoi(dstr+17);
 
 	img->stamp = mktime(&img->time);
 
-	log(l, "%s -> %s -> %d-%d-%d %d:%d:%d -> %u\n", fn, dstr,
+	log(l, "%s -> %s -> %04d-%02d-%02d %02d:%02d:%02d -> %Ld\n", fn, dstr,
 		img->time.tm_year, img->time.tm_mon, img->time.tm_mday,
 		img->time.tm_hour, img->time.tm_min, img->time.tm_sec,
 		img->stamp
@@ -77,7 +81,8 @@ void init_threaddata(threaddata_t *td, const char *ofmt, const char *ifmt, int s
 	log(&td->common.l, "- initializing buffer\n");
 	buffer_init(&td->buffer, BUFFERSIZE, loader, unloader);
 
-	font_load(&td->font, "data/sun12x22.psfu");
+	//font_load_gz(&td->font, "data/sun12x22.psfu");
+	font_load_gz(&td->font, "/usr/share/kbd/consolefonts/sun12x22.psfu.gz");
 } /*}}}*/
 void destroy_threaddata(threaddata_t *td) { /*{{{*/
 	buffer_destroy(&td->buffer, &td->common);
@@ -102,10 +107,10 @@ void *loader(unsigned int index, void* old, void* state, int *status) { /*{{{*/
 	assert(imd != NULL);
 
 	get_time(imd, fn, &common->l);
+	log(&common->l, "reading file %u (%s) with command '%s'\n", index, fn, command);
 	free(fn);
 
 	FILE *pfd = popen(command, "r");
-	log(&common->l, "reading file %u (%s) with command '%s'\n", index, fn, command);
 	if (!pfd) {
 		perror(NULL);
 	}
@@ -118,16 +123,17 @@ void *loader(unsigned int index, void* old, void* state, int *status) { /*{{{*/
 	assert(imd->orig != NULL);
 	log(&common->l, "wxh: %u x %u\n", imd->orig->width, imd->orig->height);
 
-	unsigned int powers[NSC] = {0, 4}; // zero never used
+	unsigned int values[NSC] = {0, 3};
+	unsigned int powers[NSC] = {1, 8}; // index zero never used
 	for (size_t i=0; i<NSC; ++i) {
-		unsigned int additive = (1<<powers[i])-1;
-		imd->tfsc[i] = bitmap_new(imd->tfsc[i], (imd->orig->width+additive)>>i, (imd->orig->height+additive)>>i);
+		unsigned int additive = powers[i]-1;
+		imd->tfsc[i] = bitmap_new(imd->tfsc[i], (imd->orig->width+additive)/powers[i], (imd->orig->height+additive)/powers[i]);
 		assert(imd->tfsc[i] != NULL);
 		log(&common->l, "index %u: created image %u/%u for colour transform and dimensions %u x %u\n", index, i, NSC, imd->tfsc[i]->width, imd->tfsc[i]->height);
 	}
 	to_ycbcr(imd->tfsc[0]->data, imd->orig->data, imd->orig->width*imd->orig->height);
 	for (size_t i=1; i<NSC; ++i) {
-		scalepow2(imd->tfsc[i], imd->tfsc[0], powers[i]);
+		scalepow2(imd->tfsc[i], imd->tfsc[0], values[i]);
 	}
 	return imd;
 } /*}}}*/
@@ -169,56 +175,86 @@ void *workfunc(void *data) { /*{{{*/
 	size_t index = counter_get(&td->counter);
 	log(&td->common.l, "thread says hello, starts with index %u, start is %u, end is %u\n", index, td->counter.start, td->counter.end);
 	char str[256]; // should be enough
+	const int workbase = 1;
+	const int fontsize = 0;
 	while (index < td->counter.end) {
 		int status = OK;
 		imagedata_t *cimd = buffer_get(&td->buffer, index, &td->common, &status, NULL);
 		imagedata_t *pimd;
 		if (index > 0) {
 			pimd = buffer_get(&td->buffer, index-1, &td->common, &status, NULL);
+			printf("index >0\n");
 		}
 		else {
 			pimd = buffer_get(&td->buffer, index, &td->common, &status, NULL);
+			printf("index <=0\n");
 		}
 		double deltat = difftime(cimd->stamp, pimd->stamp);
+		/*
+		printf("%Lu - %Lu = deltat = %Lf\n", pimd->stamp, cimd->stamp, deltat);
+		log(&td->common.l, "%s -> %s -> %04d-%02d-%02d %02d:%02d:%02d -> %Ld\n", "pimd", "...",
+			pimd->time.tm_year, pimd->time.tm_mon, pimd->time.tm_mday,
+			pimd->time.tm_hour, pimd->time.tm_min, pimd->time.tm_sec,
+			pimd->stamp
+		);
+		log(&td->common.l, "%s -> %s -> %04d-%02d-%02d %02d:%02d:%02d -> %Ld\n", "cimd", "...",
+			cimd->time.tm_year, cimd->time.tm_mon, cimd->time.tm_mday,
+			cimd->time.tm_hour, cimd->time.tm_min, cimd->time.tm_sec,
+			cimd->stamp
+		);
+		*/
+
+		// allocate data for output bitmap
 		assert(status == OK);
 		bitmap_t **cimgs = cimd->tfsc;
-		out = bitmap_new(out, cimgs[0]->width, cimgs[0]->height);
-		memcpy(out->data, cimgs[0]->data, sizeof(u83_t)*cimgs[0]->width*cimgs[0]->height);
+		out = bitmap_new(out, cimgs[workbase]->width, cimgs[workbase]->height);
+		log(&td->common.l, "output size: %u x %u\n", out->width, out->height);
+
+		memcpy(out->data, cimgs[workbase]->data, sizeof(u83_t)*out->width*out->height);
+
+		// DRAW HEADER {{{
+		// darken upper 108 pixels of image
 		for (unsigned int y0=0; y0<108; ++y0) {
-			unsigned int y1 = y0 >> 4;
-			for (unsigned int x0=0; x0<out->width; ++x0) {
-				unsigned int x1 = x0 >> 4;
-				unsigned int outi = y0*out->width + x0;
-				unsigned int sci = y1*cimgs[1]->width + x1;
-				out->data[outi].x[0] = cimgs[1]->data[sci].x[0]>>2;
+			for (unsigned int x0=0; x0<cimgs[workbase]->width; ++x0) {
+				unsigned int i = y0*cimgs[workbase]->width + x0;
+				out->data[i].x[0] = cimgs[workbase]->data[i].x[0]>>2;
 			}
 		}
+		// draw index number on image
 		snprintf(str, 256, "%04u", index);
-		draw_string_asc(out, 32, 15, str, &td->font, &white, 0.5f, 2);
-		snprintf(str, 256, "% 4.0lf", str, deltat);
+		draw_string_asc(out, 32, 15, str, &td->font, &white, 0.5f, fontsize);
+		// draw delta t in white or red on image
+		snprintf(str, 256, "% 4.0lf", deltat);
 		if (deltat < 14 || deltat > 16) {
-			draw_string_asc(out, 32+7*12*4, 15, str, &td->font, &red, 0.5f, 2);
+			draw_string_asc(out, 32+7*12*(1<<fontsize), 15, str, &td->font, &red, 0.5f, fontsize);
 		}
 		else {
-			draw_string_asc(out, 32+7*12*4, 15, str, &td->font, &white, 0.5f, 2);
+			draw_string_asc(out, 32+7*12*(1<<fontsize), 15, str, &td->font, &white, 0.5f, fontsize);
 		}
-		snprintf(str, 256, "%04u-%02u-%02u %02u:%02u:%02u",
-			cimd->time.tm_year, cimd->time.tm_mon, cimd->time.tm_mday,
+		// draw timestamp on image
+		snprintf(str, 256, "%04d-%02d-%02d %02d:%02d:%02d",
+			cimd->time.tm_year+1900, cimd->time.tm_mon, cimd->time.tm_mday,
 			cimd->time.tm_hour, cimd->time.tm_min, cimd->time.tm_sec
 		);
+		log(&td->common.l, "trying to draw timestamp at %d\n", out->width-strlen(str)*td->font.header.width*(1<<fontsize)-32);
 		draw_string_asc(out,
-			cimgs[0]->width-strlen(str)*td->font.header.width*4-32,
-			15, str, &td->font, &white, 0.5, 2
+			out->width-strlen(str)*td->font.header.width*(1<<fontsize)-32,
+			15, str, &td->font, &white, 0.5, fontsize
 		);
+		// }}}
+
+		// save image
 		saver(index, out, &td->common);
+
+		// relinquish input image handles
 		if (index > 0) {
 			buffer_relinquish(&td->buffer, index-1, &td->common, NULL);
 		}
 		else {
 			buffer_relinquish(&td->buffer, index, &td->common, NULL);
 		}
-
 		buffer_relinquish(&td->buffer, index, &td->common, NULL);
+		// next counter
 		index = counter_get(&td->counter);
 	}
 	bitmap_free(out);

@@ -1,8 +1,8 @@
 #ifndef __WORK_H__
 #define __WORK_H__
 
-#define NTHREADS 4
-#define HISTORY 4
+#define NTHREADS 2
+#define HISTORY 3
 #define BUFFERSIZE (NTHREADS*HISTORY)
 #define NSC 2
 
