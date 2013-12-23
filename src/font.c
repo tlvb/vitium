@@ -1,20 +1,30 @@
 #include "font.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 
-
-void font_load(pcf2_font_t *font, const char *fn) { /*{{{*/
-	FILE *fd = fopen(fn, "rb");
+void font_load_fd(pcf2_font_t *font, FILE *fd) { /*{{{*/
 	assert(fd);
 	fread(&font->header, sizeof(pcf2_header_t), 1, fd);
 	font->bitmap = malloc(sizeof(uint8_t)*
 		font->header.charsize*font->header.length
 	);
 	fread(font->bitmap, sizeof(uint8_t), font->header.charsize*font->header.length, fd);
-	fclose(fd);
 	font->bpr = font->header.charsize / font->header.height;
+} /*}}}*/
+void font_load(pcf2_font_t *font, const char *fn) { /*{{{*/
+	FILE *fd = fopen(fn, "rb");
+	font_load_fd(font, fd);
+	fclose(fd);
+} /*}}}*/
+void font_load_gz(pcf2_font_t *font, const char *fn) { /*{{{*/
+	char *command = calloc(6+strlen(fn), sizeof(char));
+	assert(command);
+	sprintf(command, "zcat %s", fn);
+	FILE *fd = popen(command, "r");
+	font_load_fd(font, fd);
+	pclose(fd);
+	free(command);
 } /*}}}*/
 void font_destroy(pcf2_font_t *font) { /*{{{*/
 	free(font->bitmap);
